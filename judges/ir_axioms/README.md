@@ -25,5 +25,5 @@ tira-cli code-submission \
             --file judges/naive/Dockerfile \
             --task trec-auto-judge \
             --dataset kiddie-20260403-training \
-            --command 'auto-judge run --workflow /auto-judge/judges/naive/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
+            --command 'auto-judge run --workflow /auto-judge/judges/ir_axioms/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
 ```
