@@ -7,7 +7,7 @@ configs:
 - config_name: truths
   data_files:
   - split: test
-    path: ["eval/rag.generation.official.eval.jsonl"]
+    path: ["eval/rag.auggen.official.eval.jsonl"]
 
 tira_configs:
   resolve_inputs_to: "."
@@ -24,7 +24,7 @@ tira_configs:
     name: "arbitrary"
   evaluator:
     image: ghcr.io/trec-auto-judge/auto-judge-code/cli:0.0.3
-    command: /evaluator.py --truth-format jsonl $inputDataset/eval/rag.generation.official.eval.jsonl ${inputRun} ${outputDir}
+    command: /evaluator.py --truth-format jsonl $inputDataset/eval/rag.auggen.official.eval.jsonl ${inputRun} ${outputDir}
 ---
 
 # TBD
@@ -34,5 +34,5 @@ tira_configs:
 Submit to TIRA via:
 
 ```
-tira-cli dataset-submission --path rag25-gen --task trec-auto-judge --split test --dry-run
+tira-cli dataset-submission --path rag25-auggen --task trec-auto-judge --split test --dry-run
 ```
