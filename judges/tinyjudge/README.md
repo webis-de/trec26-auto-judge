@@ -23,24 +23,35 @@ Install dependencies
 pip3 install autojudge[minimallm]
 ```
 
-Run it against the cache, i.e., we use only dummy values:
+Now, we can set environment variables (we do not need an valid api key and base url as we use the previously downloaded cache.
+For this, we first export the required environment variables:
 ```
-PYTHONPATH=../.. \
-OPENAI_API_KEY=empty \
-OPENAI_BASE_URL=empty \
-CACHE_DIR=example-cache-kiddie \
-OPENAI_MODEL=llama-3.1-8b-instant \
-    auto-judge run --workflow workflow.yml --rag-responses ../../data/kiddie/runs/repgen/ --rag-topics ../../data/kiddie/topics/kiddie-topics.jsonl --out-dir my-results
+export OPENAI_API_KEY=empty
+export OPENAI_BASE_URL=empty
+export CACHE_DIR=example-cache-kiddie
+export OPENAI_MODEL=llama-3.1-8b-instant
+```
+
+Now, we can run the auto-judge using those environment variables and the downloaded cache:
+
+```
+auto-judge run \
+    --workflow judges/tinyjudge/workflow.yml \
+    --rag-responses data/kiddie/runs/repgen/ \
+    --rag-topics data/kiddie/topics/kiddie-topics.jsonl \
+    --out-dir results/tinyjudge-kiddie
 ```
 
 Now, we can evaluate the results:
 
 ```
 auto-judge-evaluate meta-evaluate \
-    --truth-leaderboard ../../data/kiddie/eval/kiddie_fake.eval.ir_measures.txt \
+    --truth-leaderboard data/kiddie/eval/kiddie_fake.eval.ir_measures.txt \
     --truth-format ir_measures \
+    --truth-header \
     --eval-format ir_measures \
-    --input my-results/tinyjudge.eval.txt
+    --on-missing default \
+    --input results/tinyjudge-kiddie/tinyjudge.eval.txt
 ```
 
 
@@ -82,6 +93,27 @@ Explanation:
 
 xy.
 
+
+
+## Run a published Naive Judge
+
+This tiny judge is already published on TIRA and can also be executed locally via `tira-cli`:
+
+```bash
+OPENAI_API_KEY=empty OPENAI_BASE_URL=empty OPENAI_MODEL=llama-3.1-8b-instant \
+tira-cli run local --approach trec-auto-judge/webis/tinyjudge \
+    --input kiddie-20260605-training \
+    --forward-environment-variable OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL \
+    --mount-cache "CACHE_DIR=example-cache-kiddie"
+```
+
+The output should look like:
+
+<img width="1030" height="393" alt="Screenshot_20260703_160041" src="https://github.com/user-attachments/assets/7e0d8348-d5d2-48b7-b986-33b0a2a91039" />
+
+(This is similar how we then run private submitted AutoJudges on the test datasets, potentially via different LLMs.)
+
+
 # Re-Execution of approaches from TIRA
 
 Approaches that have been published can be easily 
@@ -90,11 +122,7 @@ Approaches that have been published can be easily
 Re-Executing things with an cache:
 
 ```
-OPENAI_API_KEY=empty OPENAI_BASE_URL=empty OPENAI_MODEL=llama-3.1-8b-instant \
-    tira-cli run local --approach trec-auto-judge/webis/tinyjudge \
-        --input kiddie-20260605-training \
-        --forward-environment-variable OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL \
-        --mount-cache "CACHE_DIR=../../data/example-caches/2026-06-30-15-02-13/CACHE_DIR/"
+
 ```
 
 vs

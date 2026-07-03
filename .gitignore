@@ -5,4 +5,8 @@ test-coverage
 *.egg-info/
 out/
 output/
+results/
+*.zip
+example-cache-kiddie/
+output-naive/
 output-kiddie/
