@@ -6,12 +6,12 @@ RUN apt-get update \
 
 RUN pip3 install uv
 
-ADD pyproject.toml /auto-judge/
 ADD judges /auto-judge/judges
+ADD pyproject.toml /auto-judge/
 
 WORKDIR /auto-judge
 
-RUN uv pip install --system -e .
+RUN uv pip install --system -e .[pyterrier]
 
 RUN python3 -c 'import nltk; nltk.download("stopwords"); nltk.download("punkt");'
 
