@@ -33,7 +33,7 @@ from autojudge_base.nugget_data import (
 import time
 
 DESC_PREFIX = (
-    "The Nuggetizer evaluates RAG responses using nuggets classified as vital, "
+    "The Nuggetizer (from the 'great nugget recall' paper) evaluates RAG responses using nuggets classified as vital, "
     "okay, or not relevant. It grades each response's coverage of a nugget as "
     "support, partial support, or not supported. "
 )

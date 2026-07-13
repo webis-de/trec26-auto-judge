@@ -2,6 +2,8 @@ Then run the dry run from the repository root:
 
 This is configured as dev-container.
 
+Please cite "The great nugget recall: Automating fact extraction and rag evaluation with large language models".
+
 In the dev-container, please run:
 
 ```bash
