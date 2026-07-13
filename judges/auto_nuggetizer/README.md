@@ -24,6 +24,33 @@ tira-cli code-submission \
     --task trec-auto-judge \
     --dataset kiddie-20260605-training \
     --forward-environment-variable OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL \
-    --command 'auto-judge run --workflow /auto-judge/judges/auto_nuggetizer/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
+    --command 'auto-judge run -variant documents-and-responses --workflow /auto-judge/judges/auto_nuggetizer/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
 ```
 
+
+```bash
+tira-cli code-submission \
+    --dry-run \
+    --path . \
+    --file judges/auto_nuggetizer/Dockerfile \
+    --cache-behaviour deterministic \
+    --mount-cache '$CACHE_DIR=EMPTY_DIR' \
+    --task trec-auto-judge \
+    --dataset kiddie-20260605-training \
+    --forward-environment-variable OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL \
+    --command 'auto-judge run -variant responses --workflow /auto-judge/judges/auto_nuggetizer/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
+```
+
+
+```bash
+tira-cli code-submission \
+    --dry-run \
+    --path . \
+    --file judges/auto_nuggetizer/Dockerfile \
+    --cache-behaviour deterministic \
+    --mount-cache '$CACHE_DIR=EMPTY_DIR' \
+    --task trec-auto-judge \
+    --dataset kiddie-20260605-training \
+    --forward-environment-variable OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL \
+    --command 'auto-judge run -variant documents --workflow /auto-judge/judges/auto_nuggetizer/workflow.yml --rag-responses $inputDataset/runs/*/ --rag-topics $inputDataset/topics/*.jsonl --out-dir $outputDir'
+```
