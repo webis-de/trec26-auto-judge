@@ -1,0 +1,20 @@
+judge_class: "judges.auto_nuggetizer.auto_nuggetizer:AutoNuggetizer"
+
+create_nuggets: true
+judge: true
+augment_report: false
+
+settings:
+  filebase: "auto_nuggetizer"
+
+variants:
+  documents:
+    nugget_settings:
+      use_documents: True
+      use_responses: False
+  responses:
+      use_documents: False
+      use_responses: True
+  documents-and-responses:
+      use_documents: True
+      use_responses: True
