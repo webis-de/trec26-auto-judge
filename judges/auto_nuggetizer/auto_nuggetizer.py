@@ -32,29 +32,28 @@ from autojudge_base.nugget_data import (
 
 import time
 
+DESC_PREFIX = (
+    "The Nuggetizer evaluates RAG responses using nuggets classified as vital, "
+    "okay, or not relevant. It grades each response's coverage of a nugget as "
+    "support, partial support, or not supported. "
+)
 
 AUTO_NUGGETIZER_SPEC = LeaderboardSpec(measures=(
-    MeasureSpec("vital_and_okay", description="Absolute number of nuggets that are assigned partial or support for vital and okay nuggets."),
-    MeasureSpec("vital", description="Absolute number of nuggets that are assigned partial or support for vital nuggets."),
-    MeasureSpec("vital_support", description="Absolute number of nuggets that are assigned support for vital nuggets."),
-    MeasureSpec("vital_partial", description="Absolute number of nuggets that are assigned partial for vital nuggets."),
-    MeasureSpec("okay_support", description="Absolute number of nuggets that are assigned support for okay nuggets."),
-    MeasureSpec("okay_partial", description="Absolute number of nuggets that are assigned partial for okay nuggets."), 
-    MeasureSpec("okay_support", description="Absolute number of nuggets that are assigned support for okay nuggets."),
-    MeasureSpec("okay", description="Absolute number of nuggets that are assigned support of partial for okay nuggets."),
-    MeasureSpec("okay_support", description="Absolute number of nuggets that are assigned support for okay nuggets."),
-    MeasureSpec("okay_support", description="Absolute number of nuggets that are assigned support for okay nuggets."),
+    MeasureSpec("vital_and_okay", description=DESC_PREFIX + "Per topic, this is the number of vital or okay nuggets receiving support or partial support. The aggregate value is the mean count across topics; higher is better."),
+    MeasureSpec("vital", description=DESC_PREFIX + "Per topic, this is the number of vital nuggets receiving support or partial support. The aggregate value is the mean count across topics; higher is better."),
+    MeasureSpec("vital_support", description=DESC_PREFIX + "Per topic, this is the number of vital nuggets receiving support. The aggregate value is the mean count across topics; higher is better."),
+    MeasureSpec("vital_partial", description=DESC_PREFIX + "Per topic, this is the number of vital nuggets receiving partial support. The aggregate value is the mean count across topics."),
+    MeasureSpec("okay_support", description=DESC_PREFIX + "Per topic, this is the number of okay nuggets receiving support. The aggregate value is the mean count across topics; higher is better."),
+    MeasureSpec("okay_partial", description=DESC_PREFIX + "Per topic, this is the number of okay nuggets receiving partial support. The aggregate value is the mean count across topics."),
+    MeasureSpec("okay", description=DESC_PREFIX + "Per topic, this is the number of okay nuggets receiving support or partial support. The aggregate value is the mean count across topics; higher is better."),
 
-    MeasureSpec("percentage_vital_and_okay", description="Percentage of nuggets that are assigned partial or support for vital and okay nuggets."),
-    MeasureSpec("percentage_vital", description="Percentage of nuggets that are assigned partial or support for vital nuggets."),
-    MeasureSpec("percentage_vital_support", description="Percentage of nuggets that are assigned support for vital nuggets."),
-    MeasureSpec("percentage_vital_partial", description="Percentage of nuggets that are assigned partial for vital nuggets."),
-    MeasureSpec("percentage_okay_support", description="Percentage of nuggets that are assigned support for okay nuggets."),
-    MeasureSpec("percentage_okay_partial", description="Percentage of nuggets that are assigned partial for okay nuggets."), 
-    MeasureSpec("percentage_okay_support", description="Percentage of nuggets that are assigned support for okay nuggets."),
-    MeasureSpec("percentage_okay", description="Percentage of nuggets that are assigned support of partial for okay nuggets."),
-    MeasureSpec("percentage_okay_support", description="Percentage of nuggets that are assigned support for okay nuggets."),
-    MeasureSpec("percentage_okay_support", description="Percentage of nuggets that are assigned support for okay nuggets."),
+    MeasureSpec("percentage_vital_and_okay", description=DESC_PREFIX + "Fraction of vital or okay nuggets receiving support or partial support, from 0.0 to 1.0. The aggregate value is the mean fraction across topics; higher is better."),
+    MeasureSpec("percentage_vital", description=DESC_PREFIX + "Fraction of vital nuggets receiving support or partial support, from 0.0 to 1.0. The aggregate value is the mean fraction across topics; higher is better."),
+    MeasureSpec("percentage_vital_support", description=DESC_PREFIX + "Fraction of vital nuggets receiving support, from 0.0 to 1.0. The aggregate value is the mean fraction across topics; higher is better."),
+    MeasureSpec("percentage_vital_partial", description=DESC_PREFIX + "Fraction of vital nuggets receiving partial support, from 0.0 to 1.0. The aggregate value is the mean fraction across topics."),
+    MeasureSpec("percentage_okay_partial", description=DESC_PREFIX + "Fraction of okay nuggets receiving partial support, from 0.0 to 1.0. The aggregate value is the mean fraction across topics."),
+    MeasureSpec("percentage_okay_support", description=DESC_PREFIX + "Fraction of okay nuggets receiving support, from 0.0 to 1.0. The aggregate value is the mean fraction across topics; higher is better."),
+    MeasureSpec("percentage_okay", description=DESC_PREFIX + "Fraction of okay nuggets receiving support or partial support, from 0.0 to 1.0. The aggregate value is the mean fraction across topics; higher is better."),
 ))
 
 class AutoNuggetizer(AutoJudge):
