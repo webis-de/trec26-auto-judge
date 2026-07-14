@@ -32,6 +32,8 @@ from autojudge_base.nugget_data import (
 
 import time
 
+MAX_ATTEMPTS = 6
+
 DESC_PREFIX = (
     "The Nuggetizer (from the 'great nugget recall' paper) evaluates RAG responses using nuggets classified as vital, "
     "okay, or not relevant. It grades each response's coverage of a nugget as "
@@ -67,6 +69,47 @@ class AutoNuggetizer(AutoJudge):
             ret[r.metadata.narrative_id].append(r)
         return ret
 
+    def build_doc_id_to_doc_via_citations(self, responses):
+        ret = {}
+        for response in responses:
+            for sentence in response.responses:
+                for citation in sentence.citations:
+                    try:
+                        ret[citation] = response.documents[citation].get_document_text()
+                    except:
+                        pass
+        return ret
+
+    def build_doc_id_to_doc_via_references(self, responses):
+        ret = {}
+        for response in responses:
+            for sentence in response.responses:
+                for citation in sentence.citations:
+                    try:
+                        doc_id = response.references[citation]
+                        ret[doc_id] = response.documents[doc_id]
+                    except:
+                        pass
+        return ret
+
+    def  build_doc_id_to_doc(self, responses):
+        ret_1, ret_2 = {}, {}
+        try:
+            ret_1 = self.build_doc_id_to_doc_via_citations(responses)
+        except:
+            pass
+
+        try:
+            ret_2 = self.build_doc_id_to_doc_via_references(responses)
+        except:
+            pass
+
+        if len(ret_1) > len(ret_2):
+            return ret_1
+        else:
+            return ret_2
+
+
     def extract_nuggets_for_topic(self, topic, responses, llm_config, use_documents, use_responses):
         from nuggetizer.models.nuggetizer import Nuggetizer
         from nuggetizer.core.types import Document, Query, Request as NuggetizerRequest
@@ -75,10 +118,7 @@ class AutoNuggetizer(AutoJudge):
         doc_id_to_doc = {}
 
         if use_documents:
-            for response in responses:
-                for sentence in response.responses:
-                    for citation in sentence.citations:
-                        doc_id_to_doc[citation] = response.documents[citation].get_document_text()
+            doc_id_to_doc = self.build_doc_id_to_doc(responses)
 
         if use_responses:
             for i, response in zip(range(len(responses)), responses):
@@ -128,9 +168,7 @@ class AutoNuggetizer(AutoJudge):
         from nuggetizer.models.nuggetizer import Nuggetizer
         from nuggetizer.core.types import Document, Query, Request as NuggetizerRequest
 
-        max_attempts = 6
-
-        for attempt in range(max_attempts):
+        for attempt in range(MAX_ATTEMPTS):
             try:
                 return self.extract_nuggets_for_topic(
                     topic,
@@ -141,7 +179,7 @@ class AutoNuggetizer(AutoJudge):
                 )
 
             except Exception as e:
-                if attempt < max_attempts - 1:
+                if attempt < MAX_ATTEMPTS - 1:
                     print("retry...")
                     time.sleep(20)
                     continue
@@ -185,15 +223,14 @@ class AutoNuggetizer(AutoJudge):
             api_type="openrouter",
         )
 
-        max_attempts = 6
-
-        for attempt in range(max_attempts):
+        for attempt in range(MAX_ATTEMPTS):
             try:
                 assigned = nuggetizer.assign(query, response.get_report_text(), reformatted_nuggets)
                 continue
             except:
                 print("retry...")
                 time.sleep(10)
+
         vital_count, okay_count = 0, 0
         vital_support, vital_partial = 0, 0
         okay_support, okay_partial = 0, 0
@@ -203,7 +240,7 @@ class AutoNuggetizer(AutoJudge):
                 l = {"topic_id": topic_id, "response_team": response.metadata.team_id, "response_run": response.metadata.run_id, "nugget": l.text, "importance": l.importance, "assignment": l.assignment}
                 f.write(json.dumps(l) + "\n")
 
-                if l["assignment"] not in ("partial_support", "support", "not_support"):
+                if l["assignment"] not in ("partial_support", "support", "not_support", "failed"):
                     raise ValueError(f"Unexpected assignment: {l['assignment']}")
 
                 if l["importance"] == "okay":
