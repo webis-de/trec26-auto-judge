@@ -33,19 +33,82 @@ def group_by_topic_id(rag_responses: Sequence[Report]) -> Dict[str, Dict[str, st
     return ret
 
 
-# Some semi-random selected weighting models from http://terrier.org/docs/v4.2/javadoc/org/terrier/matching/models/WeightingModel.html
-LEADERBOARD_SPEC = LeaderboardSpec(measures=(
-    MeasureSpec("BM25", description="BM25 retrieval score"),
-    MeasureSpec("DirichletLM", description="Dirichlet language model score"),
-    MeasureSpec("Hiemstra_LM", description="Hiemstra language model score"),
-    MeasureSpec("DFIC", description="Divergence from independence score"),
-    MeasureSpec("DPH", description="Divergence from randomness (DPH)"),
-    MeasureSpec("DLH", description="Divergence from randomness (DLH)"),
-    MeasureSpec("Tf", description="Term frequency score"),
-    MeasureSpec("TF_IDF", description="TF-IDF score"),
-    MeasureSpec("PL2", description="Divergence from randomness (PL2)"),
-    MeasureSpec("InL2", description="Inverse document frequency model (InL2)"),
-))
+WEIGHTING_MODELS = (
+    "BM25",
+    "DirichletLM",
+    "Hiemstra_LM",
+    "DFIC",
+    "DPH",
+    "DLH",
+    "Tf",
+    "TF_IDF",
+    "PL2",
+    "InL2",
+)
+
+LEADERBOARD_SPEC = LeaderboardSpec(
+    measures=tuple(
+        MeasureSpec(
+            f"{wmodel}_{aggregation}",
+            description=description.format(wmodel=wmodel),
+        )
+        for wmodel in WEIGHTING_MODELS
+        for aggregation, description in (
+            (
+                "mean",
+                "Mean per-nugget normalized {wmodel} retrieval score, from 0.0 "
+                "to 1.0; higher means the response covers the nugget bank more "
+                "consistently.",
+            ),
+            (
+                "min",
+                "Minimum per-nugget normalized {wmodel} retrieval score, from "
+                "0.0 to 1.0; higher means even the least-covered nugget is well "
+                "represented.",
+            ),
+            (
+                "max",
+                "Maximum per-nugget normalized {wmodel} retrieval score, from "
+                "0.0 to 1.0; higher means at least one nugget is strongly "
+                "represented.",
+            ),
+        )
+    )
+)
+
+
+def get_nugget_queries(
+    nugget_banks: Optional[NuggetBanksProtocol], topic_id: str
+) -> List[str]:
+    if nugget_banks is None:
+        raise ValueError("This judge requires nugget banks as input.")
+
+    try:
+        nugget_bank = nugget_banks.banks[topic_id]
+    except KeyError as error:
+        raise ValueError(f"Topic {topic_id!r} has no nugget bank.") from error
+
+    nuggets = list(nugget_bank.nugget_bank.values())
+    if not nuggets:
+        raise ValueError(f"Topic {topic_id!r} has no nuggets.")
+
+    queries: List[str] = []
+    for nugget in nuggets:
+        question = getattr(nugget, "question", None)
+        if not isinstance(question, str) or not question.strip():
+            raise ValueError(f"Topic {topic_id!r} contains an empty nugget.")
+        queries.append(question.strip())
+    return queries
+
+
+def aggregate_scores(scores: Sequence[float]) -> Dict[str, float]:
+    if not scores:
+        raise ValueError("Cannot aggregate an empty list of nugget scores.")
+    return {
+        "mean": sum(scores) / len(scores),
+        "min": min(scores),
+        "max": max(scores),
+    }
 
 
 class RetrievalJudge(AutoJudge):
@@ -97,24 +160,24 @@ class RetrievalJudge(AutoJudge):
         def pt_tokenize(text: str) -> str:
             return " ".join(tokeniser.getTokens(text))
 
-        topic_id_to_title: Dict[str, str] = {
-            i.request_id: pt_tokenize(i.title) for i in rag_topics
-        }
         topic_id_to_responses: Dict[str, Dict[str, str]] = group_by_topic_id(
             rag_responses
         )
         all_systems: set[str] = set(i.metadata.run_id for i in rag_responses)
+        topic_id_to_nuggets: Dict[str, List[str]] = {
+            topic_id: get_nugget_queries(nugget_banks, topic_id)
+            for topic_id in topic_id_to_responses
+        }
 
         builder: LeaderboardBuilder = LeaderboardBuilder(LEADERBOARD_SPEC)
 
         for topic in tqdm(topic_id_to_responses.keys(), "Process Topics"):
-            query_text: str = topic_id_to_title[topic]
             docs: List[Dict[str, str]] = [
                 {"docno": system, "text": system_response}
                 for system, system_response in topic_id_to_responses[topic].items()
             ]
-            system_to_wmodel_to_score: Dict[str, Dict[str, float]] = defaultdict(
-                lambda: defaultdict(lambda: 1000.0)
+            system_to_measure_to_score: Dict[str, Dict[str, float]] = defaultdict(
+                dict
             )
             index: Any = pt.IterDictIndexer(
                 "/not-needed/for-memory-index",
@@ -122,23 +185,45 @@ class RetrievalJudge(AutoJudge):
                 type=pt.IndexingType.MEMORY,
             ).index(docs)
 
-            for wmodel in LEADERBOARD_SPEC.measures:
-                retriever: Any = pt.terrier.Retriever(index, wmodel=wmodel.name)
-                rtr: Any = retriever.search(query_text)
-                run_id_to_score: Dict[str, float] = defaultdict(lambda: 0.0)
-                for _, i in rtr.iterrows():
-                    run_id_to_score[i["docno"]] = max(0.0, 1000.0 - i["rank"])
+            for wmodel in WEIGHTING_MODELS:
+                retriever: Any = pt.terrier.Retriever(index, wmodel=wmodel)
+                system_to_nugget_scores: Dict[str, List[float]] = {
+                    system: [] for system in all_systems
+                }
 
-                for system in all_systems:
-                    system_to_wmodel_to_score[system][wmodel.name] = run_id_to_score.get(
-                        system, 0.0
-                    )
+                for nugget in topic_id_to_nuggets[topic]:
+                    results: Any = retriever.search(pt_tokenize(nugget))
+                    raw_scores: Dict[str, float] = {
+                        row["docno"]: float(row["score"])
+                        for _, row in results.iterrows()
+                    }
+                    lowest_score = min(raw_scores.values(), default=0.0)
+                    highest_score = max(raw_scores.values(), default=0.0)
+
+                    for system in all_systems:
+                        if system not in raw_scores:
+                            normalized_score = 0.0
+                        elif highest_score > lowest_score:
+                            normalized_score = (
+                                raw_scores[system] - lowest_score
+                            ) / (highest_score - lowest_score)
+                        else:
+                            normalized_score = 1.0
+                        system_to_nugget_scores[system].append(normalized_score)
+
+                for system, nugget_scores in system_to_nugget_scores.items():
+                    for aggregation, score in aggregate_scores(
+                        nugget_scores
+                    ).items():
+                        system_to_measure_to_score[system][
+                            f"{wmodel}_{aggregation}"
+                        ] = score
 
             for system in all_systems:
                 builder.add(
                     run_id=system,
                     topic_id=topic,
-                    values=dict(system_to_wmodel_to_score[system]),
+                    values=system_to_measure_to_score[system],
                 )
 
         leaderboard: Leaderboard = builder.build()

@@ -11,7 +11,9 @@ ADD pyproject.toml /auto-judge/
 
 WORKDIR /auto-judge
 
-RUN uv pip install --system -e .[pyterrier]
+RUN uv pip install --system -e '.[test]'
+
+RUN python3 -m pytest -q \
+	judges/pyterrier_nugget_retrieval/test_retrieval_judge.py
 
 RUN python3 -c 'import nltk; nltk.download("stopwords"); nltk.download("punkt");'
-

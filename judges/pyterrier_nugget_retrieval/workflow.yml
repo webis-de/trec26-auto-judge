@@ -3,6 +3,7 @@ judge_class: "judges.pyterrier_nugget_retrieval.retrieval_judge:RetrievalJudge"
 
 create_nuggets: false
 judge: true
+judge_uses_nuggets: true
 augment_report: false
 
 settings:
