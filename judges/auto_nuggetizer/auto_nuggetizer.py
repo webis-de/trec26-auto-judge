@@ -56,6 +56,11 @@ AUTO_NUGGETIZER_SPEC = LeaderboardSpec(measures=(
     MeasureSpec("percentage_okay_partial", description=DESC_PREFIX + "Fraction of okay nuggets receiving partial support, from 0.0 to 1.0. The aggregate value is the mean fraction across topics."),
     MeasureSpec("percentage_okay_support", description=DESC_PREFIX + "Fraction of okay nuggets receiving support, from 0.0 to 1.0. The aggregate value is the mean fraction across topics; higher is better."),
     MeasureSpec("percentage_okay", description=DESC_PREFIX + "Fraction of okay nuggets receiving support or partial support, from 0.0 to 1.0. The aggregate value is the mean fraction across topics; higher is better."),
+
+    MeasureSpec("strict_vital_score", description=DESC_PREFIX + "Official AutoNuggetizer 'strict vital score' from nuggetizer.core.metrics: fraction of vital nuggets receiving full support (no partial credit), from 0.0 to 1.0. The aggregate value is the mean across topics; higher is better."),
+    MeasureSpec("strict_all_score", description=DESC_PREFIX + "Official AutoNuggetizer 'strict all score' from nuggetizer.core.metrics: fraction of all (vital and okay) nuggets receiving full support (no partial credit), from 0.0 to 1.0. The aggregate value is the mean across topics; higher is better."),
+    MeasureSpec("vital_score", description=DESC_PREFIX + "Official AutoNuggetizer 'vital score' from nuggetizer.core.metrics: fraction of vital nuggets supported, with partial support counted as 0.5 credit, from 0.0 to 1.0. The aggregate value is the mean across topics; higher is better."),
+    MeasureSpec("all_score", description=DESC_PREFIX + "Official AutoNuggetizer 'all score' from nuggetizer.core.metrics: fraction of all (vital and okay) nuggets supported, with partial support counted as 0.5 credit, from 0.0 to 1.0. The aggregate value is the mean across topics; higher is better."),
 ))
 
 class AutoNuggetizer(AutoJudge):
@@ -211,6 +216,7 @@ class AutoNuggetizer(AutoJudge):
     def assign_nuggets(self, topic_id, query, response, nuggets, llm_config, out):
         from nuggetizer.models.nuggetizer import Nuggetizer
         from nuggetizer.core.types import ScoredNugget
+        from nuggetizer.core.metrics import calculate_nugget_scores
         reformatted_nuggets = []
 
         for nugget in nuggets:
@@ -234,6 +240,7 @@ class AutoNuggetizer(AutoJudge):
         vital_count, okay_count = 0, 0
         vital_support, vital_partial = 0, 0
         okay_support, okay_partial = 0, 0
+        assigned_for_official_metrics = []
 
         with open(out, "a+") as f:
             for l in assigned:
@@ -242,6 +249,8 @@ class AutoNuggetizer(AutoJudge):
 
                 if l["assignment"] not in ("partial_support", "support", "not_support", "failed"):
                     raise ValueError(f"Unexpected assignment: {l['assignment']}")
+
+                assigned_for_official_metrics.append({"importance": l["importance"], "assignment": l["assignment"]})
 
                 if l["importance"] == "okay":
                     okay_count += 1
@@ -257,7 +266,11 @@ class AutoNuggetizer(AutoJudge):
                         okay_partial += 1
                 else:
                     raise ValueError("sadsa")
-                
+
+        # Official AutoNuggetizer measures (vital/all score, with and without partial credit)
+        # as computed by nuggetizer.core.metrics.calculate_nugget_scores.
+        official_metrics = calculate_nugget_scores(topic_id, assigned_for_official_metrics)
+
         return {
             "vital_and_okay": vital_support + vital_partial + okay_support + okay_partial,
             "vital": vital_support + vital_partial,
@@ -266,6 +279,11 @@ class AutoNuggetizer(AutoJudge):
             "okay_support": okay_support,
             "okay_partial": okay_partial,
             "okay": okay_support + okay_partial,
+
+            "strict_vital_score": official_metrics.strict_vital_score,
+            "strict_all_score": official_metrics.strict_all_score,
+            "vital_score": official_metrics.vital_score,
+            "all_score": official_metrics.all_score,
 
             "percentage_vital_and_okay": (vital_support + vital_partial + okay_support + okay_partial)  / (vital_count + okay_count) if (vital_count + okay_count) > 0 else 0,
             "percentage_vital": (vital_support + vital_partial) / vital_count if vital_count > 0 else 0,

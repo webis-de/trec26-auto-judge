@@ -28,3 +28,12 @@ RUN git clone https://github.com/mam10eks/nuggetizer.git /tmp/nuggetizer \
 	&& python -c 'from nuggetizer.models.nuggetizer import Nuggetizer' \
 	&& rm -rf /tmp/nuggetizer
 
+# nuggetizer's token counting (nuggetizer.core._llm_shared.get_response_encoding) calls
+# tiktoken.get_encoding(), which downloads BPE files from openaipublic.blob.core.windows.net
+# on first use. Pre-fetch the encodings here (while the build still has internet access) and
+# pin the cache directory so that running the judge later against an offline/local LLM never
+# needs network access for tokenisation.
+ENV TIKTOKEN_CACHE_DIR=/opt/tiktoken_cache
+RUN mkdir -p "${TIKTOKEN_CACHE_DIR}" \
+	&& python3 -c 'import tiktoken; [tiktoken.get_encoding(e) for e in ("cl100k_base", "o200k_base")]'
+
