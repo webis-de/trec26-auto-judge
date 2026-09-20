@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+from types import SimpleNamespace
 from typing import Any, Dict, Optional, Sequence, Type
 from pathlib import Path
 from tqdm import tqdm
@@ -33,6 +34,8 @@ from autojudge_base.nugget_data import (
 import time
 
 MAX_ATTEMPTS = 6
+
+VALID_ASSIGNMENTS = ("partial_support", "support", "not_support", "failed")
 
 DESC_PREFIX = (
     "The Nuggetizer (from the 'great nugget recall' paper) evaluates RAG responses using nuggets classified as vital, "
@@ -229,13 +232,25 @@ class AutoNuggetizer(AutoJudge):
             api_type="openrouter",
         )
 
+        assigned = None
         for attempt in range(MAX_ATTEMPTS):
             try:
                 assigned = nuggetizer.assign(query, response.get_report_text(), reformatted_nuggets)
-                continue
-            except:
-                print("retry...")
+                break
+            except Exception as e:
+                print(f"retry... ({e})")
                 time.sleep(10)
+
+        if assigned is None:
+            print(
+                f"WARNING: assign_nuggets exhausted {MAX_ATTEMPTS} attempts for topic "
+                f"{topic_id} due to failing LLM calls; treating all nuggets as "
+                "'not_support' so the run can continue."
+            )
+            assigned = [
+                SimpleNamespace(text=n.text, importance=n.importance, assignment="not_support")
+                for n in reformatted_nuggets
+            ]
 
         vital_count, okay_count = 0, 0
         vital_support, vital_partial = 0, 0
@@ -247,8 +262,21 @@ class AutoNuggetizer(AutoJudge):
                 l = {"topic_id": topic_id, "response_team": response.metadata.team_id, "response_run": response.metadata.run_id, "nugget": l.text, "importance": l.importance, "assignment": l.assignment}
                 f.write(json.dumps(l) + "\n")
 
-                if l["assignment"] not in ("partial_support", "support", "not_support", "failed"):
-                    raise ValueError(f"Unexpected assignment: {l['assignment']}")
+                if l["assignment"] not in VALID_ASSIGNMENTS:
+                    # Any assignment label the LLM/Nuggetizer returns that we don't
+                    # recognize is treated as "not_support" (no credit), rather than
+                    # retried or raised, so a single odd label can't crash the run.
+                    print(f"WARNING: Unexpected assignment '{l['assignment']}' for topic {topic_id}; treating as 'not_support'.")
+                    l["assignment"] = "not_support"
+
+                if l["importance"] not in ("okay", "vital"):
+                    # Any importance label we don't recognize is treated as
+                    # "okay" (the non-vital default), matching how
+                    # nuggetizer.core.metrics.calculate_nugget_scores only
+                    # special-cases "vital" and buckets everything else into
+                    # "all". A single odd label must not crash the run.
+                    print(f"WARNING: Unexpected importance '{l['importance']}' for topic {topic_id}; treating as 'okay'.")
+                    l["importance"] = "okay"
 
                 assigned_for_official_metrics.append({"importance": l["importance"], "assignment": l["assignment"]})
 
@@ -264,8 +292,6 @@ class AutoNuggetizer(AutoJudge):
                         okay_support += 1
                     elif l["assignment"] == "partial":
                         okay_partial += 1
-                else:
-                    raise ValueError("sadsa")
 
         # Official AutoNuggetizer measures (vital/all score, with and without partial credit)
         # as computed by nuggetizer.core.metrics.calculate_nugget_scores.
