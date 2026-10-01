@@ -1,0 +1,17 @@
+# StagedRelevanceJudge workflow configuration
+# 3-stage LLM cascade (first sentence / overall response / expert scrutiny),
+# each graded on a 0-3 scale, combined into four preconfigured "cascade user
+# model" measures (CASCADE_IMPATIENT_USER, CASCADE_CASUAL_READER_USER,
+# CASCADE_EXPERT_USER, CASCADE_BALANCED_USER), all reported together on every
+# run, also on the 0-3 scale.
+
+judge_class: "judges.staged_relevance_judge.staged_relevance_judge:StagedRelevanceJudge"
+
+# Lifecycle flags
+create_nuggets: false
+create_qrels: false
+judge: true
+
+settings:
+  filebase: "staged_relevance_judge"
+  segments: 1                    # how many leading response segments count as "first sentence"
