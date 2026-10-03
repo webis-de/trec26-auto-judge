@@ -301,20 +301,37 @@ class StagedRelevanceJudge:
     # ignored; text *before* the number (other than an optional label) is not.
     _SCORE_LINE_RE = re.compile(r"^(?:score\s*[:\-]?\s*)?(\d+(?:\.\d+)?)", re.IGNORECASE)
 
+    # Fallback for when the LLM ignores the "final line" instruction and puts
+    # the whole reasoning and the score on a single line (e.g. "... highly
+    # relevant. 3"). Matches a standalone number at the very end of the line
+    # (only trailing whitespace allowed after it). The negative lookbehind
+    # prevents matching the trailing digit(s) of a number that is not on its
+    # own (e.g. "-1" or "2.5", or a number immediately glued to other digits),
+    # so it does not misparse things like "-1" as "1".
+    _TRAILING_SCORE_RE = re.compile(r"(?<![\d.-])(\d+(?:\.\d+)?)\s*$")
+
     def _parse_relevance(self, result: Any) -> float:
         """Parse LLM response to a graded relevance score (0-3).
 
         Prompts instruct the LLM to reason first, then end with a final line
         containing only the score. Parsing is lenient about the exact shape
-        of that last line (an optional "Score:" label, an integer or decimal
-        value, and optional trailing explanation text are all tolerated), but
-        the numeric score must appear at the very start of the line (after
-        the optional label) and be within the valid 0-3 range. Anything else
-        (missing score, score buried in the middle of reasoning text,
-        out-of-range value, empty/garbled response, a non-response error
-        object, ...) is treated as a parsing failure and scored as 0, rather
-        than guessing from reasoning text that may itself mention unrelated
-        numbers.
+        of that last line:
+
+        - an optional "Score:" label, an integer or decimal value, and
+          optional trailing explanation text are all tolerated as long as the
+          numeric score appears at the very start of the line (after the
+          optional label); or
+        - if that fails, a standalone numeric score at the very end of the
+          line is also accepted, to tolerate LLMs that ignore the
+          "final line" instruction and append the score to the same line as
+          their reasoning (e.g. "... highly relevant. 3").
+
+        Either way the parsed value must be within the valid 0-3 range.
+        Anything else (missing score, score buried in the middle of reasoning
+        text, out-of-range value, empty/garbled response, a non-response
+        error object, ...) is treated as a parsing failure and scored as 0,
+        rather than guessing from reasoning text that may itself mention
+        unrelated numbers.
         """
         try:
             if not isinstance(result, MinimaLlmResponse):
@@ -330,11 +347,15 @@ class StagedRelevanceJudge:
                 return 0.0
 
             last_line = lines[-1]
-            match = self._SCORE_LINE_RE.match(last_line)
-            if match:
-                value = float(match.group(1))
-                if 0.0 <= value <= GRADE_MAX:
-                    return value
+            for pattern, matcher in (
+                (self._SCORE_LINE_RE, self._SCORE_LINE_RE.match),
+                (self._TRAILING_SCORE_RE, self._TRAILING_SCORE_RE.search),
+            ):
+                match = matcher(last_line)
+                if match:
+                    value = float(match.group(1))
+                    if 0.0 <= value <= GRADE_MAX:
+                        return value
 
             print(f"[StagedRelevanceJudge] Could not parse score from last line: {last_line!r}")
             return 0.0

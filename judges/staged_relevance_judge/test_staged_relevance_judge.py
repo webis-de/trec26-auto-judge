@@ -119,6 +119,38 @@ def test_parse_relevance_accepts_leading_score_with_optional_label_or_trailing_t
 
 
 @pytest.mark.parametrize(
+    "text,expected",
+    [
+        # Real-world examples: the LLM ignores the "final line" instruction
+        # and appends the score to the end of its reasoning, on one line.
+        (
+            "The answer lists several reasons that people might be boycotting Starbucks, directly "
+            "addressing the question. It provides a concise explanation of potential motivations, "
+            "making it highly relevant. 3",
+            3.0,
+        ),
+        (
+            "The text directly explains a key way African rulers contributed to the triangular "
+            "trade\u2014by capturing and selling people to European traders, which is central to the "
+            "question. 3",
+            3.0,
+        ),
+        (
+            "The answer is somewhat simplified and lacks the nuance and depth a seasoned expert would "
+            "provide, so it differs from what I would write. 1",
+            1.0,
+        ),
+        # Standalone trailing score after a sentence-ending period, without a "Score" label.
+        ("This is clearly on topic. 2", 2.0),
+        ("Not relevant at all. 0", 0.0),
+    ],
+)
+def test_parse_relevance_accepts_trailing_score_after_reasoning_on_same_line(text, expected):
+    judge = StagedRelevanceJudge()
+    assert judge._parse_relevance(MinimaLlmResponse(request_id="x", text=text)) == expected
+
+
+@pytest.mark.parametrize(
     "text",
     [
         # Out-of-range "scores".
@@ -127,10 +159,13 @@ def test_parse_relevance_accepts_leading_score_with_optional_label_or_trailing_t
         "Score: 4",
         # Non-numeric "scores".
         "three",
-        # Score not at the start of the line (buried in reasoning text).
+        # Score not at the start, nor standalone at the end, of the line
+        # (buried in the middle of reasoning text, or glued to other text).
         "The score is 1.",
         "I read page 3 of the document and found nothing relevant.",
         "The query has 2 keywords but the response ignores them.",
+        # A negative number must not be misparsed via its trailing digit(s).
+        "The final adjustment was -1",
         # Garbled / unparseable responses.
         "unparseable response",
         "I cannot judge this.",

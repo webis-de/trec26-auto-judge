@@ -20,13 +20,20 @@ For every response, three separate LLM requests are made:
 Each measure is a graded LLM judgment on a 0-3 scale (0 = not at all, 3 = fully), matching common
 graded relevance judgment conventions. Each prompt asks the LLM to briefly reason about its
 judgment, then end the response with a final line containing only the score. Parsing is lenient
-about the exact shape of that last line — an optional `Score:`-style label, an integer or decimal
-value (e.g. `3`, `Score: 3`, `2.0`, `2 - mostly relevant`), and trailing explanation text are all
-tolerated — but the numeric score must appear at the very start of the line (after the optional
-label) and be within the valid 0-3 range. Anything else (no score on the last line, a score buried
-in the middle of reasoning text, an out-of-range value, an empty/garbled response, or an LLM call
-failure) is treated as a parsing failure and scored as `0` rather than guessing from reasoning
-text that may itself mention unrelated numbers.
+about the exact shape of that last line in two ways:
+
+1. An optional `Score:`-style label, an integer or decimal value (e.g. `3`, `Score: 3`, `2.0`,
+   `2 - mostly relevant`), and trailing explanation text are all tolerated, as long as the numeric
+   score appears at the very start of the line (after the optional label); or
+2. if that fails, a standalone numeric score at the very end of the line is also accepted, to
+   tolerate LLMs that ignore the "final line" instruction and append the score to the end of their
+   reasoning on the same line (e.g. `"...making it highly relevant. 3"`).
+
+Either way the parsed value must be within the valid 0-3 range. Anything else (no score on the
+last line, a score buried in the middle of reasoning text or glued to other digits, an
+out-of-range value, an empty/garbled response, or an LLM call failure) is treated as a parsing
+failure and scored as `0` rather than guessing from reasoning text that may itself mention
+unrelated numbers.
 
 ## Aggregation: four cascade user models
 
