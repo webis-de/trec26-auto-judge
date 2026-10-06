@@ -1,0 +1,32 @@
+# UmbrelaJudge workflow configuration
+# LLM-based relevance judge using UMBRELA's prompts (Thomas et al., "Large
+# Language Models can Accurately Predict Searcher Preferences"). Grades each
+# RAG response's relevance to its topic on UMBRELA's 0-3 scale and reports
+# UMBRELA_RELEVANCE, UMBRELA_RELEVANT, and UMBRELA_VALID_RESPONSE_RATE.
+#
+# UmbrelaJudge also supports create_qrels() (standard Qrels with doc_id=run_id,
+# from the same UMBRELA grading), but it is disabled here so no .qrels.txt file
+# is written by default. Set create_qrels to true and uncomment qrels_class
+# below to also produce it as a side artifact; judge() does not depend on it
+# either way (it always regrades responses itself).
+
+judge_class: "judges.umbrela_judge.umbrela_judge:UmbrelaJudge"
+# qrels_class: "judges.umbrela_judge.umbrela_judge:UmbrelaJudge"
+
+# Lifecycle flags
+create_nuggets: false
+create_qrels: false
+judge: true
+
+settings:
+  filebase: "umbrela_judge-{_name}"
+  prompt_style: "bing"    # "bing" (step-by-step DNA prompt, default) or "basic"
+  few_shot: false         # use UMBRELA's built-in worked examples (bing style only)
+
+# Run with `--variant basic` to use UMBRELA's simpler "basic" prompt instead
+# of the default step-by-step "bing" prompt. Run with `--all-variants` to
+# produce both in one pass. `{_name}` in filebase resolves to "default"
+# (base config) or the variant name, so each run's output files don't collide.
+variants:
+  basic:
+    prompt_style: "basic"
