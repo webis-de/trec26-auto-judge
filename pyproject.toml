@@ -29,6 +29,7 @@ classifiers = [
 dependencies = [
     "autojudge-base>=0.3.18",
     "tira>=0.0.100",
+    "typesafe-sdk>=0.7.5",
     "tqdm>=4.0",
 ]
 

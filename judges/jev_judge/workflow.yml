@@ -1,0 +1,15 @@
+# JevJudge workflow configuration
+# TinyJudge-style judge that uses the TypeSafe "jev" API (typesafe_sdk) instead
+# of a chat-completion LLM. Needs TYPESAFE_API_KEY in the environment.
+
+judge_class: "judges.jev_judge.jev_judge:JevJudge"
+
+# Lifecycle flags
+create_nuggets: false
+create_qrels: false
+judge: true
+
+settings:
+  filebase: "jev_judge"
+  segments: 1          # how many leading response segments count as the "first sentence"
+  max_concurrency: 8   # parallel jev requests
